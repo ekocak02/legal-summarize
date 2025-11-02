@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hierarchical Text Summarizer</title>
+    <style>
+        :root {
+            --bg-primary: #121212;
+            --bg-secondary: #1e1e1e;
+            --bg-tertiary: #252525;
+            --text-primary: #e0e0e0;
+            --text-secondary: #aaaaaa;
+            --border-color: #444;
+            --accent-color: #4ecdc4;
+            --accent-hover: #3aaa9f;
+            --error-color: #f44336;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 25px;
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #ffffff;
+        }
+
+        textarea {
+            width: 98%;
+            min-height: 250px;
+            padding: 15px;
+            font-size: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            resize: vertical;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+
+        #char-counter {
+            text-align: right;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            padding-right: 2%;
+        }
+
+        #char-counter.error {
+            color: var(--error-color);
+            font-weight: bold;
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: var(--accent-color);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button:disabled {
+            background-color: #555;
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        .result-box {
+            margin-top: 20px;
+        }
+
+        .result-box h2 {
+            color: #ffffff;
+            border-bottom: 2px solid var(--bg-tertiary);
+            padding-bottom: 5px;
+        }
+
+        #summary-output {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            border-radius: 5px;
+            min-height: 150px;
+            white-space: pre-wrap; /* Preserves formatting of the summary */
+            line-height: 1.6;
+            color: var(--text-primary);
+        }
+
+        .error-message {
+            color: var(--error-color);
+            font-weight: bold;
+        }
+
+        /* Loading Spinner Animation */
+        .loader-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 150px;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--accent-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Hierarchical Document Summarizer (BART + T5)</h1>
+        
+        <textarea id="text-input" placeholder="Paste your long text here..."></textarea>
+        <div id="char-counter">0 / 45000</div>
+        
+        <button id="summarize-button">Summarize</button>
+        
+        <div class="result-box">
+            <h2>Generated Summary:</h2>
+            <div id="summary-output" aria-live="polite">Your summary will appear here...</div>
+        </div>
+    </div>
+
+    <script>
+        const textInput = document.getElementById('text-input');
+        const summarizeButton = document.getElementById('summarize-button');
+        const summaryOutput = document.getElementById('summary-output');
+        const charCounter = document.getElementById('char-counter');
+        const charLimit = 45000;
+
+        // --- Character Counter ---
+        textInput.addEventListener('input', () => {
+            const count = textInput.value.length;
+            charCounter.textContent = `${count} / ${charLimit}`;
+            if (count > charLimit) {
+                charCounter.classList.add('error');
+            } else {
+                charCounter.classList.remove('error');
+            }
+        });
+
+        // --- Summarize Button Click ---
+        summarizeButton.addEventListener('click', () => {
+            const textToSummarize = textInput.value;
+
+            // --- Start Loading State ---
+            summarizeButton.disabled = true;
+            summarizeButton.textContent = 'Summarizing, please wait...';
+            // Add spinner
+            summaryOutput.innerHTML = '<div class="loader-container"><div class="loader"></div></div>';
+            summaryOutput.classList.remove('error-message');
+
+            if (!textToSummarize.trim()) {
+                displayError('Please enter text to summarize.');
+                return;
+            }
+
+            if (textToSummarize.length > charLimit) {
+                displayError(`Input text is too long. The maximum allowed length is ${charLimit} characters.`);
+                return;
+            }
+
+            // --- Fetch API ---
+            fetch('/summarize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text: textToSummarize })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // Handle HTTP errors like 500, 413, etc.
+                    return response.json().then(errData => {
+                        throw new Error(errData.error || `HTTP Error: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // --- Display Success ---
+                if (data.summary) {
+                    summaryOutput.textContent = data.summary;
+                } else if (data.error) {
+                    displayError(data.error);
+                }
+            })
+            .catch(error => {
+                // --- Display Fetch/Network Errors ---
+                console.error('Request error:', error);
+                displayError(`An error occurred: ${error.message}`);
+            })
+            .finally(() => {
+                // --- End Loading State ---
+                summarizeButton.disabled = false;
+                summarizeButton.textContent = 'Summarize';
+                // Note: The spinner is already removed by 'displayError' or success assignment.
+            });
+        });
+
+        function displayError(message) {
+            summaryOutput.textContent = message;
+            summaryOutput.classList.add('error-message');
+            summarizeButton.disabled = false;
+            summarizeButton.textContent = 'Summarize';
+        }
+
+    </script>
+
+</body>
+</html>
