@@ -1,0 +1,151 @@
+# Hierarchical Legal Text Summarization (BART & Flan-T5)
+
+This project implements an end-to-end hierarchical summarization pipeline designed specifically for long legal documents. It uses a two-stage approach: a **BART-based chunk summarizer** generates intermediate summaries, and a **Flan-T5-based synthesizer** combines these into a final, coherent summary.
+
+The entire pipeline is wrapped in a Flask API for easy integration and use.
+
+## 🚀 Features
+
+* **Hierarchical Pipeline:** Handles texts longer than a model's token limit by chunking, summarizing chunks, and synthesizing summaries.
+* **Hybrid Model Approach:** Uses BART for detailed intermediate summarization and Flan-T5 for high-level final synthesis.
+* **Modular & Testable:** Code is structured into decoupled services (`DataProcessor`, `Chunker`, `SummarizationService`) for clarity and maintainability.
+* **Configuration Driven:** All model paths, training hyperparameters, and processing settings are managed via a central `config.py`.
+* **Flask API:** Includes a production-ready `app.py` to serve the model as a web service.
+
+## 🏛️ Pipeline Architecture
+
+The summarization logic follows a multi-step process:
+
+1.  **Process:** The raw text is cleaned, normalized (e.g., fixing unicode, standardizing legal markers) by the `DataProcessor`.
+2.  **Chunk (BART):** The cleaned text is intelligently split into overlapping semantic chunks by the `Chunker`.
+3.  **Summarize Chunks:** Each chunk is summarized individually by the fine-tuned BART model ("Chunk Summarizer").
+4.  **Combine & Check:** The intermediate summaries are combined into a single document.
+5.  **Synthesize (Flan-T5):**
+    * **If Short:** The combined text is sent directly to the Flan-T5 model ("Synthesizer").
+    * **If Long:** The combined text is *re-chunked* and passes through an *intermediate synthesis layer* before the final synthesis step.
+6.  **Final Summary:** The Flan-T5 model produces the final, comprehensive summary.
+
+## 🔧 Installation
+
+1.  Clone the repository:
+    ```bash
+    git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
+    cd your-repo-name
+    ```
+
+2.  Create and activate a virtual environment (recommended):
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+
+3.  Install the required packages:
+    *(Oluşturduğumuz `requirements.txt` dosyasını buraya ekleyebilirsiniz)*
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  Download NLTK data (required for ROUGE scoring):
+    ```python
+    import nltk
+    nltk.download('punkt')
+    ```
+
+### `requirements.txt`
+
+```
+flask
+transformers==4.57.0
+torch
+datasets
+evaluate
+rouge_score
+bert_score
+nltk
+pandas
+tqdm
+ftfy
+```
+
+## 🏃‍♂️ How to Run
+
+### 1. Training the Pipeline
+
+The pipeline requires two models to be trained in sequence.
+
+**Step 1: Train the BART Chunk Summarizer**
+This model learns to summarize small text chunks.
+```bash
+python train_bart.py
+```
+
+**Step 2: Generate Data for the Synthesizer**
+This script uses the trained BART model to create a new training set for T5.
+```bash
+python generate_synthesizer_data.py
+```
+
+**Step 3: Train the Flan-T5 Synthesizer**
+This model learns to "summarize the summaries" into a final, coherent text.
+```bash
+python train_flanT5.py
+```
+
+### 2. Evaluating the Model
+
+To run the full pipeline on the test set and save the predictions:
+```bash
+python evaluation.py
+```
+
+To calculate ROUGE and BERTScore metrics from the generated predictions:
+```bash
+python evaluate_scores.py results/final_predictions_ca_bart_and_t5.jsonl
+```
+
+### 3. Running the Web Application (API)
+
+Once models are trained and paths are set in `config.py`, run the Flask server:
+```bash
+python app.py
+```
+The server will start on `http://0.0.0.0:5000`. You can send a POST request to `/summarize`:
+
+**Request:**
+```json
+{
+  "text": "Your very long legal document text goes here..."
+}
+```
+
+**Response:**
+```json
+{
+  "summary": "The final, synthesized summary of your document."
+}
+```
+
+## 📂 Project Structure
+
+```
+├── models/                     # Trained model checkpoints
+├── data/                       # Raw, processed, and split data
+├── results/                    # Training checkpoints and evaluation outputs
+│
+├── app.py                      # Flask API server
+├── summarization_service.py    # Core summarization logic
+│
+├── config.py                   # Central configuration file
+├── processor.py                # Text cleaning and processing class
+├── chunker.py                  # Text chunking and oracle summary class
+│
+├── train_bart.py               # Script for training Model 1
+├── generate_synthesizer_data.py # Script to generate data for Model 2
+├── train_flanT5.py             # Script for training Model 2
+│
+├── evaluation.py               # Run inference on test set
+├── evaluate_scores.py          # Calculate ROUGE/BERTScore metrics
+│
+├── requirements.txt            # Project dependencies
+└── README.md                   # This file
+```
