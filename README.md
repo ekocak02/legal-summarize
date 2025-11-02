@@ -29,8 +29,8 @@ The summarization logic follows a multi-step process:
 
 1.  Clone the repository:
     ```bash
-    git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
-    cd your-repo-name
+    git clone [https://github.com/ekocak02/legal-summarize.git](https://github.com/ekocak02/legal-summarize.git)
+    cd legal-summarize
     ```
 
 2.  Create and activate a virtual environment (recommended):
@@ -40,15 +40,20 @@ The summarization logic follows a multi-step process:
     ```
 
 3.  Install the required packages:
-    *(Oluşturduğumuz `requirements.txt` dosyasını buraya ekleyebilirsiniz)*
     ```bash
     pip install -r requirements.txt
     ```
 
-4.  Download NLTK data (required for ROUGE scoring):
+4. Download Models and Data (DVC):
+    ```bash
+    dvc pull
+    ```
+    
+5.  Download NLTK data (required for ROUGE scoring):
     ```python
     import nltk
     nltk.download('punkt')
+    nltk.download('punkt_tab')
     ```
 
 ### `requirements.txt`
