@@ -230,6 +230,8 @@ EVALUATION_CONFIG = {
         'no_repeat_ngram_size': 3,
         'length_penalty': 1.2,
         'early_stopping': True,
+        'temperature': 0.2,
+        'top_p': 0.95
     },
     # Parameters for the final Flan-T5 synthesis step
     'final_synthesis_generation_params': {
@@ -238,6 +240,8 @@ EVALUATION_CONFIG = {
         'no_repeat_ngram_size': 3,
         'length_penalty': 2.0, 
         'early_stopping': True,
+        'temperature': 0.2,
+        'top_p': 0.95
     },
 
     # --- Advanced Prompts ---
@@ -252,14 +256,14 @@ Combined Summary:
 """,
     # Prompt for the final synthesis step
     'final_synthesis_prompt': """
-As an expert legal analyst, draft a final, comprehensive summary of a legal bill based on the key points provided below. 
-The summary must be a coherent, well-structured text. 
-It should capture the main purpose of the law by using the most important **key terms and phrases** from the provided points. 
-Synthesize, do not just list.
-Key Points:
+Task: Create a comprehensive summary of the document using the information provided in the [KEY POINTS] section below.
+Rule: Your summary must contain ONLY the facts and information provided in [KEY POINTS].
+PROHIBITION: No institution name, date, action, amount, or result not included in [KEY POINTS] may be included. Do not comment; simply report.
+
+[KEY POINTS]:
 {chunk_summaries}
 
-Final Summary:
+[SUMMARY]:
 """
 }
 
