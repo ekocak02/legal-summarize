@@ -1,0 +1,12 @@
+/data
+/models
+
+/law
+
+/notebooks
+
+v1_scores.md
+
+__pycache__/
+
+results/
