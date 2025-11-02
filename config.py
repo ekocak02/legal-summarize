@@ -1,0 +1,269 @@
+# config.py
+
+"""
+Central configuration file for the Legal Text Summarization project.
+This file contains all the settings and constants used across different
+stages of the project, including data processing, model training, and inference.
+"""
+
+import os
+
+# --- Column Names ---
+# Defines the standard column names used in the dataset.
+TEXT_COLUMN = 'text'
+SUMMARY_COLUMN = 'summary'
+TITLE_COLUMN = 'title'
+
+
+# --- Data Processing Configuration ---
+# Settings for the data ingestion, cleaning, and filtering pipeline.
+DATA_PROCESSING_CONFIG = {
+    'source_dir': 'data/raw',
+    'save_dir': 'data/processed',
+    'combine_title_with_text': True,
+    'normalize_structure': True,
+    # Note: Regex patterns are defined within the DataProcessor class
+    # as they are considered part of the implementation logic.
+}
+
+
+# --- Filtering and Tokenization Configuration ---
+# Parameters for filtering the dataset based on token counts.
+# Also specifies the tokenizer to be used for this purpose.
+FILTERING_CONFIG = {
+    'apply_filtering': True,
+    'tokenizer_for_filtering': 'facebook/bart-base',
+    'min_text_tokens': 100,
+    'max_text_tokens': 10000,
+    'min_summary_tokens': 100,
+    'max_summary_tokens': 1024,
+}
+
+STRUCTURAL_SPECIAL_TOKENS = [
+    "[PARAGRAPH_BREAK]",
+    "[SECTION_START]",
+]
+# Add subsections from 'a' to 'z'
+for char_code in range(ord('a'), ord('z') + 1):
+    STRUCTURAL_SPECIAL_TOKENS.append(f"[SUBSECTION_{chr(char_code)}]")
+
+# Add a few common roman numeral subitems (add more if needed)
+common_roman_items = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x', 'xi', 'xii', 'xiii', 'xiv', 'xv', 'xvi', 'xvii', 'xviii', 'xix', 'xx']
+for item in common_roman_items:
+    STRUCTURAL_SPECIAL_TOKENS.append(f"[SUBITEM_{item}]")
+
+# --- Logging Configuration ---
+# Basic configuration for the application-wide logger.
+LOGGING_CONFIG = {
+    'level': 'INFO',
+    'format': '%(asctime)s - %(levelname)s - %(message)s',
+    'datefmt': '%Y-%m-%d %H:%M:%S',
+}
+
+# --- Data Split Settings ---
+DATA_SPLIT_CONFIG = {
+    'processed_data_dir': 'data/processed',
+    'split_data_dir': 'data/split',
+    'validation_size': 0.25,
+    'shuffle_seed': 42,
+}
+
+# --- Chunking Settings ---
+CHUNKING_CONFIG = {
+    'model_name': 'facebook/bart-base', # Determines the tokenizer
+    'chunk_size': 1020,         # Max token count for one chunk
+    'overlap': 120,             # Token overlap when splitting long paragraphs
+    'min_chunk_char_len': 384,  # Minimum character length for paragraphs to be processed
+    'header_word_count': 100,
+
+    # Oracle Summary settings (only for training)
+    'oracle_sentence_count': 2, # Number of best sentences to select for each chunk
+}
+
+# --- Model 1 (BART - Chunk Summarizer) Training Settings ---
+TRAINING_CONFIG = {
+    # --- Model and Data Paths ---
+    'base_model': 'facebook/bart-base',
+    
+    # UPDATED: Added 'chunked_data_dir' key so the 'train_model.py' script
+    # can find the 'train_chunked.jsonl' file.
+    'chunked_data_dir': DATA_SPLIT_CONFIG['split_data_dir'],
+    
+    'final_model_dir': 'models/billsum-bart_v2',
+
+    # --- Tokenization Parameters ---
+    'max_input_length': 1024,
+    'max_target_length': 256, # UPDATED (Kaggle): Reduced from 1024 to 256
+
+    # --- Subsampling for quick tests (set to None to use all data) ---
+    'max_train_samples': None,
+    'max_eval_samples': None,
+    
+    # --- Seq2SeqTrainingArguments ---
+    # This sub-dictionary is passed directly to the Seq2SeqTrainingArguments class.
+    'training_arguments': {
+        'output_dir': "./results/training_checkpoints_bart_v2",
+        
+        # Core Training Params
+        'num_train_epochs': 5,
+        'per_device_train_batch_size': 12, # UPDATED (Kaggle): Increased from 1 to 12
+        'per_device_eval_batch_size': 12,  # UPDATED (Kaggle): Increased from 1 to 12
+        'gradient_accumulation_steps': 2, 
+        'label_smoothing_factor': 0.1,
+        # Learning Rate and Scheduler
+        'learning_rate': 2e-5,
+        'lr_scheduler_type': "cosine",
+        'warmup_steps': 500,
+        'weight_decay': 0.01,
+
+        # Evaluation and Saving
+        'eval_strategy': "steps",
+        'eval_steps': 500,
+        'save_strategy': "steps",
+        'save_steps': 500,
+        'load_best_model_at_end': True,
+        'metric_for_best_model': "rouge2", # UPDATED (Kaggle): Was "rougeL"
+        'save_total_limit': 2,
+        'greater_is_better': True,
+
+        # Performance and Reporting
+        'fp16': True, # Use True if a CUDA GPU is available
+        'logging_steps': 100,
+        'predict_with_generate': True,
+        
+        # Generation Params (for predict_with_generate)
+        'generation_max_length': 100, # UPDATED (Kaggle): Was 200
+        'generation_num_beams': 3,
+    }
+}
+
+# --- Model 2 (FLAN-T5 - Synthesizer) Training Settings ---
+SYNTHESIZER_TRAINING_CONFIG = {
+    # --- Model and Data Paths ---
+    'base_model': 'google/flan-t5-base', # CHANGED: Switched to Flan-T5
+    'task_prefix': 'summarize: ',        # ADDED: Required prefix for T5 summarization task
+    
+    # This file will be generated by the NEW 'generate_synthesizer_data.py' script.
+    'train_data_path': 'results/bart_generated_summaries.jsonl',
+    
+    'final_model_dir': 'models/flan-t5_v2', # CHANGED: Updated model directory name
+
+    # --- Data Filtering for Training ---
+    # Used by 'train_flanT5.py' to filter original short documents
+    # (Part 1 of hybrid training).
+    'data_filter_max_tokens': 1200,
+    
+    # 'train_flanT5.py' uses this directory to find original short documents
+    # for Part 1 of hybrid training.
+    'processed_data_dir': DATA_SPLIT_CONFIG['split_data_dir'],
+
+    # --- Tokenization Parameters ---
+    'max_input_length': 1024,
+    'max_target_length': 512, # UPDATED (Kaggle): Was 1024
+    
+    # --- Subsampling for quick tests (set to None to use all data) ---
+    'max_train_samples': None,
+    'max_eval_samples': None,
+
+    # --- Seq2SeqTrainingArguments ---
+    # Hyperparameters can be tuned. These are reasonable defaults for flan-t5-base.
+    'training_arguments': {
+        'output_dir': "./results/synthesizer_checkpoints_flan_t5_v2", # CHANGED: New checkpoint dir
+        'num_train_epochs': 10,
+        'per_device_train_batch_size': 2, # UPDATED (Kaggle): Was 1
+        'per_device_eval_batch_size': 2,  # UPDATED (Kaggle): Was 1
+        'learning_rate': 5e-5, # A common learning rate for T5 fine-tuning
+        'lr_scheduler_type': "cosine",
+        'warmup_steps': 1000, # UPDATED (Kaggle): Was 20
+        'weight_decay': 0.01,
+        'eval_strategy': "steps",
+        'eval_steps': 1000, # UPDATED (Kaggle): Was 20
+        'save_strategy': "steps",
+        'save_steps': 1000, # UPDATED (Kaggle): Was 20
+        'load_best_model_at_end': True,
+        'metric_for_best_model': "rouge2", # UPDATED (Kaggle): Was "rougeL"
+        'save_total_limit': 2,
+        'greater_is_better': True,
+        'fp16': True, # Set automatically based on CUDA availability in the script
+        'logging_steps': 100, # UPDATED (Kaggle): Was 10
+        'predict_with_generate': True,
+        'generation_max_length': 512,
+        'generation_num_beams': 3
+    }
+}
+
+# --- Evaluation Settings ---
+EVALUATION_CONFIG = {
+
+    'apply_filtering_to_test_set': True,
+
+    # --- Model Paths ---
+    'chunk_summarizer_model_path': 'models/billsum-bart_v2', # Path to the trained BART model
+    'synthesis_model_path': 'models/flan-t5_v2',    # Path to the trained Flan-T5 model
+
+    # --- Data Paths ---
+    'test_data_path': 'data/raw/bill_sum_test.jsonl',
+    
+    # UPDATED: 'evaluation.py' will use this single file
+    'flan_t5_predictions_output_path': 'results/final_predictions_ca_bart_and_t5.jsonl',
+
+    # --- Processing and Batching ---
+    'eval_batch_size': 16, # UPDATED (Kaggle): Was 2
+    'max_test_samples': None, # Use None to evaluate on the full test set, or set a number for debugging (e.g., 100)
+    
+    # --- Conditional Logic Threshold ---
+    'synthesizer_input_max_tokens': 1024, # Token limit to decide if re-chunking is needed
+
+    # --- Generation Parameters ---
+    # Parameters for the BART chunk summarizer
+    'chunk_generation_params': {
+        'max_length': 384,
+        'num_beams': 4,
+        'no_repeat_ngram_size': 3,
+        'length_penalty': 1.2,
+        'early_stopping': True,
+    },
+    # Parameters for the intermediate Flan-T5 synthesis step
+    'intermediate_synthesis_generation_params': {
+        'max_length': 512, 
+        'num_beams': 4,
+        'no_repeat_ngram_size': 3,
+        'length_penalty': 1.2,
+        'early_stopping': True,
+    },
+    # Parameters for the final Flan-T5 synthesis step
+    'final_synthesis_generation_params': {
+        'max_length': 1024, 
+        'num_beams': 5,
+        'no_repeat_ngram_size': 3,
+        'length_penalty': 2.0, 
+        'early_stopping': True,
+    },
+
+    # --- Advanced Prompts ---
+    # Prompt for the intermediate synthesis step (when BART summaries are > 1024 tokens)
+    'intermediate_synthesis_prompt':"""
+Combine the following summary points into a concise, unified paragraph. The points are from a single section of a legal document. 
+Synthesize them, removing redundancy.
+Points:
+{chunk_summaries}
+
+Combined Summary:
+""",
+    # Prompt for the final synthesis step
+    'final_synthesis_prompt': """
+As an expert legal analyst, draft a final, comprehensive summary of a legal bill based on the key points provided below. 
+The summary must be a coherent, well-structured text. 
+It should capture the main purpose of the law by using the most important **key terms and phrases** from the provided points. 
+Synthesize, do not just list.
+Key Points:
+{chunk_summaries}
+
+Final Summary:
+"""
+}
+
+# --- Flask Application Settings ---
+APP_CONFIG = {
+    'character_limit': 45000
+}
