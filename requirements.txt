@@ -1,0 +1,12 @@
+flask
+transformers==4.57.0
+torch
+datasets
+evaluate
+rouge_score
+bert_score
+nltk
+pandas
+tqdm
+ftfy
+dvc
