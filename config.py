@@ -205,7 +205,7 @@ EVALUATION_CONFIG = {
     'test_data_path': 'data/raw/bill_sum_test.jsonl',
     
     # UPDATED: 'evaluation.py' will use this single file
-    'flan_t5_predictions_output_path': 'results/final_predictions_ca_bart_and_t5.jsonl',
+    'flan_t5_predictions_output_path': 'results/final_evaluation_predictions.jsonl',
 
     # --- Processing and Batching ---
     'eval_batch_size': 16, # UPDATED (Kaggle): Was 2
