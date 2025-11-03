@@ -38,24 +38,6 @@ If Long: The combined text is re-chunked and passes through an intermediate synt
 
 Final Summary: The Flan-T5 model produces the final, comprehensive summary.
 
-This flow can be visualized as follows:
-
-graph TD
-    A[Raw Legal Text] --> B(Process: Clean & Normalize <br> `processor.py`);
-    B --> C(Chunk: Semantic Splitting <br> `chunker.py`);
-    C --> D(Summarize Chunks <br> `train_bart.py`);
-    D --> E(Combine Chunk Summaries);
-    E --> F{Input > 1024 tokens?};
-    F -- Yes --> G(Re-Chunk & <br> Intermediate Synthesis <br> `summarization_service.py`);
-    F -- No --> H(Final Synthesis <br> `train_flanT5.py`);
-    G --> H;
-    H --> I[Final Coherent Summary];
-
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style I fill:#f9f,stroke:#333,stroke-width:2px
-    style F fill:#ff9,stroke:#333,stroke-width:2px
-
-
 🔧 Installation
 
 Clone the repository:
@@ -128,7 +110,7 @@ python evaluation.py
 
 
 
-To calculate ROUGE and BERTScore metrics from the generated predictions (ensure you have results/final_predictions_ca_bart_and_t5.jsonl or update the path):
+To calculate ROUGE and BERTScore metrics from the generated predictions (ensure you have results/final_evaluation_predictions.jsonl or update the path):
 
 python evaluate_scores.py results/final_evaluation_predictions.jsonl
 
